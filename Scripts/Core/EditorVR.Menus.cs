@@ -61,6 +61,28 @@ namespace UnityEditor.Experimental.EditorVR.Core
 					mainMenu.settingsMenuProviders = m_SettingsMenuProviders;
 					mainMenu.settingsMenuItemProviders = m_SettingsMenuItemProviders;
 				}
+
+				var menuOrigins = obj as IUsesMenuOrigins;
+				if (menuOrigins != null)
+				{
+					Transform mainMenuOrigin;
+					var proxy = Rays.GetProxyForRayOrigin(rayOrigin);
+					if (proxy != null && proxy.menuOrigins.TryGetValue(rayOrigin, out mainMenuOrigin))
+					{
+						menuOrigins.menuOrigin = mainMenuOrigin;
+						Transform alternateMenuOrigin;
+						if (proxy.alternateMenuOrigins.TryGetValue(rayOrigin, out alternateMenuOrigin))
+							menuOrigins.alternateMenuOrigin = alternateMenuOrigin;
+					}
+				}
+
+				var customMenuOrigins = obj as IUsesCustomMenuOrigins;
+				if (customMenuOrigins != null)
+				{
+					customMenuOrigins.customMenuOrigin = GetCustomMainMenuOrigin;
+					customMenuOrigins.customAlternateMenuOrigin = GetCustomAlternateMenuOrigin;
+				}
+
 			}
 
 			public void DisconnectInterface(object obj, Transform rayOrigin = null)
@@ -187,6 +209,36 @@ namespace UnityEditor.Experimental.EditorVR.Core
 				var mainMenuActivator = deviceData.mainMenuActivator;
 				if (mainMenuActivator != null)
 					mainMenuActivator.activatorButtonMoveAway = alternateMenu.visible;
+			}
+
+			Transform GetCustomMainMenuOrigin(Transform rayOrigin)
+			{
+				Transform mainMenuOrigin = null;
+
+				var proxy = Rays.GetProxyForRayOrigin(rayOrigin);
+				if (proxy != null)
+				{
+					var menuOrigins = proxy.menuOrigins;
+					if (menuOrigins.ContainsKey(rayOrigin))
+						mainMenuOrigin = menuOrigins[rayOrigin];
+				}
+
+				return mainMenuOrigin;
+			}
+
+			Transform GetCustomAlternateMenuOrigin(Transform rayOrigin)
+			{
+				Transform alternateMenuOrigin = null;
+
+				var proxy = Rays.GetProxyForRayOrigin(rayOrigin);
+				if (proxy != null)
+				{
+					var alternateMenuOrigins = proxy.alternateMenuOrigins;
+					if (alternateMenuOrigins.ContainsKey(rayOrigin))
+						alternateMenuOrigin = alternateMenuOrigins[rayOrigin];
+				}
+
+				return alternateMenuOrigin;
 			}
 
 			internal void UpdateMenuVisibilities()
