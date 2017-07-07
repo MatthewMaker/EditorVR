@@ -15,7 +15,8 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 		IUsesViewerBody, ISetDefaultRayVisibility
 	{
 		const float k_PreviewDuration = 0.1f;
-		const float k_MaxPreviewScale = 0.3f;
+		const float k_MinPreviewScale = 0.01f;
+		const float k_MaxPreviewScale = 0.2f;
 		const float k_RotateSpeed = 50f;
 		const float k_TransitionDuration = 0.1f;
 		const float k_ScaleBump = 1.1f;
@@ -53,8 +54,8 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 		bool m_AutoHidePreview;
 		Vector3 m_PreviewPrefabScale;
 		Vector3 m_PreviewTargetScale;
-		Vector3 m_GrabPreviewTargetScale;
-		Vector3 m_GrabPreviewPivotOffset;
+		Vector3 m_PreviewPivotOffset;
+		Bounds m_PreviewBounds;
 		Transform m_PreviewObjectClone;
 
 		Coroutine m_PreviewCoroutine;
@@ -230,10 +231,10 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 			m_PreviewPrefabScale = m_PreviewObjectTransform.localScale;
 
 			// Normalize total scale to 1
-			var previewTotalBounds = ObjectUtils.GetBounds(m_PreviewObjectTransform);
+			m_PreviewBounds = ObjectUtils.GetBounds(m_PreviewObjectTransform);
 
 			// Don't show a preview if there are no renderers
-			if (previewTotalBounds.size == Vector3.zero)
+			if (m_PreviewBounds.size == Vector3.zero)
 			{
 				ObjectUtils.Destroy(m_PreviewObjectTransform.gameObject);
 				return;
@@ -254,32 +255,13 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 				light.enabled = false;
 			}
 
-			var pivotOffset = m_PreviewObjectTransform.position - previewTotalBounds.center;
+			m_PreviewPivotOffset = m_PreviewObjectTransform.position - m_PreviewBounds.center;
 			m_PreviewObjectTransform.SetParent(transform, false);
 
-			var maxComponent = previewTotalBounds.size.MaxComponent();
+			var maxComponent = m_PreviewBounds.size.MaxComponent();
 			var scaleFactor = 1 / maxComponent;
 			m_PreviewTargetScale = m_PreviewPrefabScale * scaleFactor;
-			m_PreviewObjectTransform.localPosition = pivotOffset * scaleFactor + Vector3.up * 0.5f;
-
-			// Object will preview at the same size when grabbed
-			m_GrabPreviewTargetScale = Vector3.one * maxComponent;
-			var previewExtents = previewTotalBounds.extents;
-			m_GrabPreviewPivotOffset = pivotOffset;
-
-			// If bounds are greater than offset, set to bounds
-			if (previewExtents.y > m_GrabPreviewPivotOffset.y)
-				m_GrabPreviewPivotOffset.y = previewExtents.y;
-
-			if (previewExtents.z > m_GrabPreviewPivotOffset.z)
-				m_GrabPreviewPivotOffset.z = previewExtents.z;
-
-			if (maxComponent > k_MaxPreviewScale)
-			{
-				// Object will be preview at the maximum scale
-				m_GrabPreviewTargetScale = Vector3.one * k_MaxPreviewScale;
-				m_GrabPreviewPivotOffset = pivotOffset * scaleFactor + (Vector3.up + Vector3.forward) * 0.5f * k_MaxPreviewScale;
-			}
+			m_PreviewObjectTransform.localPosition = m_PreviewPivotOffset * scaleFactor + Vector3.up * 0.5f;
 
 			var vertCount = 0;
 			foreach (var meshFilter in m_PreviewObjectTransform.GetComponentsInChildren<MeshFilter>())
@@ -376,7 +358,7 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 			{
 				if (gridItem.m_PreviewObjectTransform)
 				{
-					this.PlaceSceneObject(gridItem.m_PreviewObjectTransform, m_PreviewPrefabScale * this.GetViewerScale());
+					this.PlaceSceneObject(gridItem.m_PreviewObjectTransform, m_PreviewPrefabScale);
 				}
 				else
 				{
@@ -524,21 +506,48 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 			var currentVelocity = 0f;
 			const float kDuration = 1f;
 
+			var viewerScale = this.GetViewerScale();
+			var maxComponent = m_PreviewBounds.size.MaxComponent() / viewerScale;
+			var targetScale = Vector3.one * maxComponent;
+			
+			// Object will preview at the same size when grabbed
+			var previewExtents = m_PreviewBounds.extents / viewerScale;
+			var pivotOffset = m_PreviewPivotOffset / viewerScale;
+
+			// If bounds are greater than offset, set to bounds
+			if (previewExtents.y > pivotOffset.y)
+				pivotOffset.y = previewExtents.y;
+
+			if (previewExtents.z > pivotOffset.z)
+				pivotOffset.z = previewExtents.z;
+
+			if (maxComponent < k_MinPreviewScale) {
+				// Object will be preview at the maximum scale
+				targetScale = Vector3.one * k_MinPreviewScale;
+				pivotOffset = pivotOffset * scaleFactor + (Vector3.up + Vector3.forward) * 0.5f * k_MinPreviewScale;
+			}
+
+			if (maxComponent > k_MaxPreviewScale) {
+				// Object will be preview at the maximum scale
+				targetScale = Vector3.one * k_MaxPreviewScale;
+				pivotOffset = pivotOffset * scaleFactor + (Vector3.up + Vector3.forward) * 0.5f * k_MaxPreviewScale;
+			}
+
 			while (currentTime < kDuration - 0.05f)
 			{
 				if (m_DragObject == null)
 					yield break; // Exit coroutine if m_GrabbedObject is destroyed before the loop is finished
 
 				currentTime = MathUtilsExt.SmoothDamp(currentTime, kDuration, ref currentVelocity, 0.5f, Mathf.Infinity, Time.deltaTime);
-				m_DragObject.localScale = Vector3.Lerp(currentLocalScale, m_GrabPreviewTargetScale, currentTime);
+				m_DragObject.localScale = Vector3.Lerp(currentLocalScale, targetScale, currentTime);
 
 				if (m_PreviewObjectClone)
-					m_PreviewObjectClone.localPosition = Vector3.Lerp(currentPreviewOffset, m_GrabPreviewPivotOffset, currentTime);
+					m_PreviewObjectClone.localPosition = Vector3.Lerp(currentPreviewOffset, pivotOffset, currentTime);
 
 				yield return null;
 			}
 
-			m_DragObject.localScale = m_GrabPreviewTargetScale;
+			m_DragObject.localScale = targetScale;
 		}
 
 		static IEnumerator HideGrabbedObject(GameObject itemToHide, Renderer cubeRenderer)
