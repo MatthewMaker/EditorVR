@@ -46,6 +46,15 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 		[SerializeField]
 		Color m_SelectedColor;
 
+		[SerializeField]
+		Color m_PrefabColor;
+
+		[SerializeField]
+		Color m_PrefabHoverColor;
+
+		[SerializeField]
+		Color m_PrefabSelectedColor;
+
 		[Tooltip("The fraction of the cube height to use for stacking grabbed rows")]
 		[SerializeField]
 		float m_StackingFraction = 0.3f;
@@ -192,12 +201,25 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 			UpdateArrow(expanded);
 
 			// Set selected/hover/normal color
-			if (hovering)
-				cubeMaterial.color = m_HoverColor;
-			else if (selected)
-				cubeMaterial.color = m_SelectedColor;
+			var isPrefab = PrefabUtility.GetPrefabType(data.gameObject) == PrefabType.PrefabInstance;
+			if (isPrefab)
+			{
+				if (hovering)
+					cubeMaterial.color = m_PrefabHoverColor;
+				else if (selected)
+					cubeMaterial.color = m_PrefabSelectedColor;
+				else
+					cubeMaterial.color = m_PrefabColor;
+			}
 			else
-				cubeMaterial.color = m_NormalColor;
+			{
+				if (hovering)
+					cubeMaterial.color = m_HoverColor;
+				else if (selected)
+					cubeMaterial.color = m_SelectedColor;
+				else
+					cubeMaterial.color = m_NormalColor;
+			}
 		}
 
 		public void UpdateArrow(bool? expanded, bool immediate = false)
