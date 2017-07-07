@@ -17,7 +17,11 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 		const float k_MaxPreviewScale = 0.2f;
 		const float k_RotateSpeed = 50f;
 		const float k_TransitionDuration = 0.1f;
+		const float k_ScaleBump = 1.1f;
 		const int k_PreviewRenderQueue = 9200;
+
+		const int k_AutoHidePreviewVertexCount = 10000;
+		const int k_HidePreviewVertexCount = 100000;
 
 		[SerializeField]
 		Text m_Text;
@@ -45,6 +49,7 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 		Transform m_PreviewObjectTransform;
 
 		bool m_Setup;
+		bool m_AutoHidePreview;
 		Vector3 m_PreviewPrefabScale;
 		Vector3 m_PreviewTargetScale;
 		Vector3 m_GrabPreviewTargetScale;
@@ -72,6 +77,9 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 				if (m_IconPrefab == value)
 				{
 					m_Icon.SetActive(true);
+					if (m_PreviewObjectTransform && !m_AutoHidePreview)
+						m_Icon.SetActive(false);
+
 					return;
 				}
 
@@ -83,6 +91,9 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 				m_Icon.transform.localPosition = Vector3.up * 0.5f;
 				m_Icon.transform.localRotation = Quaternion.AngleAxis(90, Vector3.down);
 				m_Icon.transform.localScale = Vector3.one;
+
+				if (m_PreviewObjectTransform && !m_AutoHidePreview)
+					m_Icon.SetActive(false);
 			}
 		}
 
@@ -154,6 +165,8 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 
 			m_PreviewCoroutine = null;
 			m_VisibilityCoroutine = null;
+			m_AutoHidePreview = false;
+			icon.transform.localScale = Vector3.one;
 
 			// First time setup
 			if (!m_Setup)
@@ -174,11 +187,6 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 			}
 
 			InstantiatePreview();
-
-			icon.transform.localScale = Vector3.one;
-
-			if (m_PreviewObjectTransform)
-				m_PreviewObjectTransform.localScale = Vector3.zero;
 
 			m_Text.text = listData.name;
 		}
@@ -272,8 +280,36 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 				m_GrabPreviewPivotOffset = pivotOffset * scaleFactor + (Vector3.up + Vector3.forward) * 0.5f * k_MaxPreviewScale;
 			}
 
-			m_PreviewObjectTransform.gameObject.SetActive(false);
-			m_PreviewObjectTransform.localScale = Vector3.zero;
+			var vertCount = 0;
+			foreach (var meshFilter in m_PreviewObjectTransform.GetComponentsInChildren<MeshFilter>())
+			{
+				if (meshFilter.sharedMesh)
+					vertCount += meshFilter.sharedMesh.vertexCount;
+			}
+
+			foreach (var skinnedMeshRenderer in m_PreviewObjectTransform.GetComponentsInChildren<SkinnedMeshRenderer>()) {
+				if (skinnedMeshRenderer.sharedMesh)
+					vertCount += skinnedMeshRenderer.sharedMesh.vertexCount;
+			}
+
+			// Do not show previews over a max vert count
+			if (vertCount > k_HidePreviewVertexCount)
+			{
+				ObjectUtils.Destroy(m_PreviewObjectTransform.gameObject);
+				return;
+			}
+
+			// Auto hide previews over a smaller vert count
+			if (vertCount > k_AutoHidePreviewVertexCount)
+			{
+				m_AutoHidePreview = true;
+				m_PreviewObjectTransform.localScale = Vector3.zero;
+			}
+			else
+			{
+				m_PreviewObjectTransform.localScale = m_PreviewTargetScale;
+				icon.SetActive(false);
+			}
 		}
 
 		protected override void OnDragStarted(BaseHandle handle, HandleEventData eventData)
@@ -361,8 +397,15 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 		{
 			if (m_PreviewObjectTransform && gameObject.activeInHierarchy)
 			{
-				this.StopCoroutine(ref m_PreviewCoroutine);
-				m_PreviewCoroutine = StartCoroutine(AnimatePreview(false));
+				if (m_AutoHidePreview)
+				{
+					this.StopCoroutine(ref m_PreviewCoroutine);
+					m_PreviewCoroutine = StartCoroutine(AnimatePreview(false));
+				}
+				else
+				{
+					m_PreviewObjectTransform.localScale = m_PreviewTargetScale * k_ScaleBump;
+				}
 			}
 		}
 
@@ -370,8 +413,15 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 		{
 			if (m_PreviewObjectTransform && gameObject.activeInHierarchy)
 			{
-				this.StopCoroutine(ref m_PreviewCoroutine);
-				m_PreviewCoroutine = StartCoroutine(AnimatePreview(true));
+				if (m_AutoHidePreview)
+				{
+					this.StopCoroutine(ref m_PreviewCoroutine);
+					m_PreviewCoroutine = StartCoroutine(AnimatePreview(true));
+				}
+				else
+				{
+					m_PreviewObjectTransform.localScale = m_PreviewTargetScale;
+				}
 			}
 		}
 
