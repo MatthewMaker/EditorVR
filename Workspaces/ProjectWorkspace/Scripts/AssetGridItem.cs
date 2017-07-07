@@ -14,7 +14,7 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 	sealed class AssetGridItem : DraggableListItem<AssetData, string>, IPlaceSceneObject, IUsesSpatialHash, IUsesViewerBody
 	{
 		const float k_PreviewDuration = 0.1f;
-		const float k_MaxPreviewScale = 0.2f;
+		const float k_MaxPreviewScale = 0.3f;
 		const float k_RotateSpeed = 50f;
 		const float k_TransitionDuration = 0.1f;
 		const float k_ScaleBump = 1.1f;
@@ -367,7 +367,7 @@ namespace UnityEditor.Experimental.EditorVR.Workspaces
 			{
 				if (gridItem.m_PreviewObjectTransform)
 				{
-					this.PlaceSceneObject(gridItem.m_PreviewObjectTransform, m_PreviewPrefabScale);
+					this.PlaceSceneObject(gridItem.m_PreviewObjectTransform, m_PreviewPrefabScale * this.GetViewerScale());
 				}
 				else
 				{
