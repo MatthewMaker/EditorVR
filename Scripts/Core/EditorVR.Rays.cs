@@ -46,6 +46,7 @@ namespace UnityEditor.Experimental.EditorVR.Core
 				IGetPreviewOriginMethods.getPreviewOriginForRayOrigin = GetPreviewOriginForRayOrigin;
 				IUsesRaycastResultsMethods.getFirstGameObject = GetFirstGameObject;
 				IRayToNodeMethods.requestNodeFromRayOrigin = RequestNodeFromRayOrigin;
+				IIsRayActiveMethods.isRayActive = IsRayActive;
 			}
 
 			internal override void OnDestroy()
@@ -178,6 +179,7 @@ namespace UnityEditor.Experimental.EditorVR.Core
 						foreach (var rayOriginPair in proxy.rayOrigins)
 						{
 							var node = rayOriginPair.Key;
+							var rayOrigin = rayOriginPair.Value;
 
 							var systemDevices = deviceInputModule.GetSystemDevices();
 							var actionMap = inputModule.actionMap;
@@ -193,17 +195,29 @@ namespace UnityEditor.Experimental.EditorVR.Core
 									evrDeviceData.Add(deviceData);
 									deviceData.proxy = proxy;
 									deviceData.node = node;
-									deviceData.rayOrigin = rayOriginPair.Value;
+									deviceData.rayOrigin = rayOrigin;
 									deviceData.inputDevice = device;
 									deviceData.uiInput = deviceInputModule.CreateActionMapInput(actionMap, device);
-									deviceData.directSelectInput = deviceInputModule.CreateActionMapInput(deviceInputModule.directSelectActionMap, device);
 
 									// Add RayOrigin transform, proxy and ActionMapInput references to input module list of sources
-									inputModule.AddRaycastSource(proxy, node, deviceData.uiInput, rayOriginPair.Value);
+									inputModule.AddRaycastSource(proxy, node, deviceData.uiInput, rayOrigin, source =>
+									{
+										if (!source.draggedObject && evr.GetNestedModule<DirectSelection>().IsHovering(source.rayOrigin))
+											return false;
+
+										if ((deviceData.menuHideFlags[deviceData.mainMenu] & Menus.MenuHideFlags.Hidden) == 0)
+										{
+											if (Menus.OnHover(source))
+												return true;
+
+											return false;
+										}
+
+										return true;
+									});
 								}
 							}
 
-							var rayOrigin = rayOriginPair.Value;
 							rayOrigin.name = string.Format("{0} Ray Origin", node);
 							var rayTransform = ObjectUtils.Instantiate(evr.m_ProxyRayPrefab.gameObject, rayOrigin).transform;
 							rayTransform.position = rayOrigin.position;

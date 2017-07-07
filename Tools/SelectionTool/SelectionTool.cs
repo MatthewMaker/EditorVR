@@ -9,9 +9,8 @@ namespace UnityEditor.Experimental.EditorVR.Tools
 {
 	sealed class SelectionTool : MonoBehaviour, ITool, IUsesRayOrigin, IUsesRaycastResults, ICustomActionMap,
 		ISetHighlight, ISelectObject, ISetManipulatorsVisible, IIsHoveringOverUI, IUsesDirectSelection, ILinkedObject,
-		ICanGrabObject
+		ICanGrabObject, IUsesNode, IIsRayActive, IIsMainMenuVisible, IIsInMiniWorld
 	{
-		public ActionMap actionMap { get { return m_ActionMap; } }
 		[SerializeField]
 		ActionMap m_ActionMap;
 
@@ -23,9 +22,11 @@ namespace UnityEditor.Experimental.EditorVR.Tools
 
 		readonly Dictionary<Transform, GameObject> m_SelectionHoverGameObjects = new Dictionary<Transform, GameObject>();
 
-		public Transform rayOrigin { private get; set; }
+		public ActionMap actionMap { get { return m_ActionMap; } }
 
-		public Func<Transform, bool> isRayActive;
+		public Transform rayOrigin { private get; set; }
+		public Node? node { private get; set; }
+
 		public event Action<GameObject, Transform> hovered;
 
 		public List<ILinkedObject> linkedObjects { get; set; }
@@ -45,6 +46,8 @@ namespace UnityEditor.Experimental.EditorVR.Tools
 
 			if (this.IsSharedUpdater(this))
 			{
+				this.SetManipulatorsVisible(this, !multiSelect);
+
 				var directSelection = this.GetDirectSelection();
 
 				m_SelectionHoverGameObjects.Clear();
@@ -53,7 +56,7 @@ namespace UnityEditor.Experimental.EditorVR.Tools
 					var selectionTool = (SelectionTool)linkedObject;
 					var selectionRayOrigin = selectionTool.rayOrigin;
 
-					if (!selectionTool.IsActive())
+					if (!selectionTool.IsRayActive())
 						continue;
 
 					var hover = this.GetFirstGameObject(selectionRayOrigin);
@@ -106,12 +109,18 @@ namespace UnityEditor.Experimental.EditorVR.Tools
 					if (!this.CanGrabObject(directHoveredObject, directRayOrigin))
 						continue;
 
-					var directSelectInput = (DirectSelectInput)directSelectionData.input;
+					var grabbingNode = directSelectionData.node;
+					var selectionTool = linkedObjects.Cast<SelectionTool>().FirstOrDefault(linkedObject => linkedObject.node == grabbingNode);
+					if (selectionTool == null)
+						continue;
+
+					if (!selectionTool.IsDirectActive())
+						continue;
 
 					// Only overwrite an existing selection if it does not contain the hovered object
 					// In the case of multi-select, only add, do not remove
-					if (directSelectInput.select.wasJustPressed && !Selection.objects.Contains(directHoveredObject))
-						this.SelectObject(directHoveredObject, rayOrigin, multiSelect);
+					if (selectionTool.m_SelectionInput.select.wasJustPressed && !Selection.objects.Contains(directHoveredObject))
+						this.SelectObject(directHoveredObject, directRayOrigin, multiSelect);
 
 					GameObject lastHover;
 					if (m_HoverGameObjects.TryGetValue(directRayOrigin, out lastHover) && lastHover != directHoveredObject)
@@ -127,10 +136,7 @@ namespace UnityEditor.Experimental.EditorVR.Tools
 				}
 			}
 
-			var multiSelectControl = m_SelectionInput.multiSelect;
-			this.SetManipulatorsVisible(this, !multiSelectControl.isHeld);
-
-			if (!IsActive())
+			if (!IsRayActive())
 				return;
 
 			// Need to call GetFirstGameObject a second time because we do not guarantee shared updater executes first
@@ -178,7 +184,21 @@ namespace UnityEditor.Experimental.EditorVR.Tools
 			return true;
 		}
 
-		bool IsActive()
+		bool IsDirectActive()
+		{
+			if (rayOrigin == null)
+				return false;
+
+			if (this.IsInMiniWorld(rayOrigin))
+				return true;
+
+			if (this.IsMainMenuVisible(rayOrigin))
+				return false;
+
+			return true;
+		}
+
+		bool IsRayActive()
 		{
 			if (rayOrigin == null)
 				return false;
@@ -186,7 +206,13 @@ namespace UnityEditor.Experimental.EditorVR.Tools
 			if (this.IsHoveringOverUI(rayOrigin))
 				return false;
 
-			if (!isRayActive(rayOrigin))
+			if (this.IsMainMenuVisible(rayOrigin))
+				return false;
+
+			if (this.IsInMiniWorld(rayOrigin))
+				return false;
+
+			if (!this.IsRayActive(rayOrigin))
 				return false;
 
 			return true;

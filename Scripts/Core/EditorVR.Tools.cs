@@ -69,7 +69,6 @@ namespace UnityEditor.Experimental.EditorVR.Core
 
 			internal static void SpawnDefaultTools(IProxy proxy)
 			{
-				Func<Transform, bool> isRayActive = Rays.IsRayActive;
 				var vacuumables = evr.GetNestedModule<Vacuumables>();
 				var lockModule = evr.GetModule<LockModule>();
 				var defaultTools = evr.m_DefaultTools;
@@ -90,10 +89,7 @@ namespace UnityEditor.Experimental.EditorVR.Core
 						var tool = toolData.tool;
 						var selectionTool = tool as SelectionTool;
 						if (selectionTool)
-						{
 							selectionTool.hovered += lockModule.OnHovered;
-							selectionTool.isRayActive = isRayActive;
-						}
 
 						var vacuumTool = tool as VacuumTool;
 						if (vacuumTool)
@@ -111,8 +107,6 @@ namespace UnityEditor.Experimental.EditorVR.Core
 					var mainMenuActivator = Menus.SpawnMainMenuActivator(inputDevice);
 					deviceData.mainMenuActivator = mainMenuActivator;
 					mainMenuActivator.selected += Menus.OnMainMenuActivatorSelected;
-					mainMenuActivator.hoverStarted += Menus.OnMainMenuActivatorHoverStarted;
-					mainMenuActivator.hoverEnded += Menus.OnMainMenuActivatorHoverEnded;
 
 					var pinnedToolButton = Menus.SpawnPinnedToolButton(inputDevice);
 					deviceData.previousToolButton = pinnedToolButton;
@@ -351,7 +345,6 @@ namespace UnityEditor.Experimental.EditorVR.Core
 							maps.Add(alternateMenuInput);
 					}
 
-					maps.Add(deviceData.directSelectInput);
 					maps.Add(deviceData.uiInput);
 				}
 

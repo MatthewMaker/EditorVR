@@ -94,7 +94,7 @@ namespace UnityEditor.Experimental.EditorVR.Menus
 		Coroutine m_VisibilityCoroutine;
 		Coroutine m_FrameRevealCoroutine;
 		int m_Direction;
-		GradientPair m_GradientPair;
+		float m_MenuHeight;
 
 		Transform[] m_MenuFaceContentTransforms;
 		Vector3[] m_MenuFaceContentOriginalLocalPositions;
@@ -164,6 +164,8 @@ namespace UnityEditor.Experimental.EditorVR.Menus
 			}
 		}
 
+		public float menuHeight { get { return m_MenuHeight; } }
+
 		int currentFaceIndex
 		{
 			get
@@ -181,8 +183,6 @@ namespace UnityEditor.Experimental.EditorVR.Menus
 
 		public event Action<Transform> buttonHovered;
 		public event Action<Transform> buttonClicked;
-		public event Action opening;
-		public event Action closing;
 
 		void Awake()
 		{
@@ -215,6 +215,9 @@ namespace UnityEditor.Experimental.EditorVR.Menus
 
 			m_MenuFaceContentOriginalLocalScale = m_MenuFaceContentTransforms[0].localScale;
 			m_MenuFaceContentHiddenLocalScale = new Vector3(0f, m_MenuFaceContentOriginalLocalScale.y * 0.5f, m_MenuFaceContentOriginalLocalScale.z);
+
+			var bounds = ObjectUtils.GetBounds(gameObject.transform);
+			m_MenuHeight = bounds.size.y;
 
 			transform.localScale = Vector3.zero;
 			m_AlternateMenu.localScale = Vector3.zero;
@@ -437,9 +440,6 @@ namespace UnityEditor.Experimental.EditorVR.Menus
 
 			m_VisibilityState = VisibilityState.TransitioningIn;
 
-			if (opening != null)
-				opening();
-
 			foreach (var face in m_MenuFaces)
 			{
 				face.Show();
@@ -480,9 +480,6 @@ namespace UnityEditor.Experimental.EditorVR.Menus
 				yield break;
 
 			m_VisibilityState = VisibilityState.TransitioningOut;
-
-			if (closing != null)
-				closing();
 
 			foreach (var face in m_MenuFaces)
 			{
