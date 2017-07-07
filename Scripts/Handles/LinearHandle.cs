@@ -9,6 +9,7 @@ namespace UnityEditor.Experimental.EditorVR.Handles
 	sealed class LinearHandle : BaseHandle, IAxisConstraints
 	{
 		const float k_MaxDragDistance = 1000f;
+		const float k_ScaleBump = 1.3f;
 
 		class LinearHandleEventData : HandleEventData
 		{
@@ -51,12 +52,14 @@ namespace UnityEditor.Experimental.EditorVR.Handles
 		protected override void OnHandleHoverStarted(HandleEventData eventData)
 		{
 			UpdateHandleTip(eventData as LinearHandleEventData);
+			transform.localScale *= k_ScaleBump;
 			base.OnHandleHoverStarted(eventData);
 		}
 
 		protected override void OnHandleHoverEnded(HandleEventData eventData)
 		{
 			UpdateHandleTip(eventData as LinearHandleEventData);
+			transform.localScale /= k_ScaleBump;
 			base.OnHandleHoverEnded(eventData);
 		}
 
