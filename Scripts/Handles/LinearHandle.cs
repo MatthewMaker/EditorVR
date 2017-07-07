@@ -24,6 +24,9 @@ namespace UnityEditor.Experimental.EditorVR.Handles
 		[SerializeField]
 		bool m_OrientDragPlaneToRay = true;
 
+		[SerializeField]
+		bool m_ScaleBump;
+
 		[FlagsProperty]
 		[SerializeField]
 		ConstrainedAxis m_Constraints;
@@ -52,14 +55,20 @@ namespace UnityEditor.Experimental.EditorVR.Handles
 		protected override void OnHandleHoverStarted(HandleEventData eventData)
 		{
 			UpdateHandleTip(eventData as LinearHandleEventData);
-			transform.localScale *= k_ScaleBump;
+
+			if (m_ScaleBump)
+				transform.localScale *= k_ScaleBump;
+
 			base.OnHandleHoverStarted(eventData);
 		}
 
 		protected override void OnHandleHoverEnded(HandleEventData eventData)
 		{
 			UpdateHandleTip(eventData as LinearHandleEventData);
-			transform.localScale /= k_ScaleBump;
+
+			if (m_ScaleBump)
+				transform.localScale /= k_ScaleBump;
+
 			base.OnHandleHoverEnded(eventData);
 		}
 
